@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Programmablaufplan frei bauen · Diebstahlsicherung</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0f2027;
+    --bg-2: #0b191f;
+    --panel: #16333b;
+    --panel-2: #1c3e46;
+    --line: #274a52;
+    --trace: #c08552;
+    --trace-dim: #7a5a3d;
+    --accent: #4fd1c5;
+    --accent-dim: #2e6b66;
+    --text: #edeae1;
+    --text-dim: #9fb3b0;
+    --success: #5fd068;
+    --success-glow: rgba(95,208,104,0.35);
+    --error: #e2665a;
+    --error-glow: rgba(226,102,90,0.35);
+    --radius: 6px;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html,body{
+    margin:0; padding:0; min-height:100%;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(79,209,197,0.06), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(192,133,82,0.08), transparent 45%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    line-height: 1.55;
+  }
+
+  body{ display:flex; justify-content:center; padding: 32px 16px 64px; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  .app{ width:100%; max-width: 820px; }
+
+  .eyebrow{
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--trace);
+    display:flex; align-items:center; gap:10px; margin-bottom: 10px;
+  }
+  .eyebrow .dot{ width:7px; height:7px; border-radius:50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+  h1{ font-family: var(--display); font-weight:700; font-size: clamp(26px, 5vw, 34px); margin: 0 0 6px; letter-spacing: -0.01em; }
+  .subtitle{ color: var(--text-dim); font-size: 14.5px; margin: 0 0 26px; max-width: 62ch; }
+
+  .panel{
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px 22px 26px;
+  }
+  .task-eyebrow{ font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--trace); margin-bottom: 8px; }
+  .task-title{ font-family: var(--display); font-weight:600; font-size: 20px; margin: 0 0 10px; }
+  .scenario{ color: var(--text-dim); font-size: 13.5px; margin: 0 0 14px; max-width: 68ch; }
+
+  .howto{
+    font-size: 12px; color: var(--text-dim);
+    background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 10px 14px; margin-bottom: 18px;
+  }
+  .howto b{ color: var(--text); }
+  .howto .legend{ display:inline-flex; align-items:center; gap:5px; margin-right:14px; white-space:nowrap; }
+  .legend-dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .legend-dot.ja{ background: var(--success); }
+  .legend-dot.nein{ background: var(--error); }
+
+  /* ---------- Canvas ---------- */
+  .canvas-wrap{
+    position: relative;
+    width: 100%;
+    height: 660px;
+    background:
+      radial-gradient(circle, var(--line) 1px, transparent 1.4px);
+    background-size: 26px 26px;
+    background-color: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin-bottom: 18px;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .canvas-svg{ position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1; overflow:visible; }
+  .canvas-svg path.edge-hit{ pointer-events: stroke; cursor: pointer; }
+
+  .edge-path{ fill:none; stroke: var(--trace-dim); stroke-width: 2; }
+  .edge-path.ja{ stroke: var(--success); }
+  .edge-path.nein{ stroke: var(--error); }
+  .edge-hit{ fill:none; stroke: transparent; stroke-width: 16; }
+  .preview-path{ fill:none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; }
+
+  .node{
+    position: absolute;
+    z-index: 2;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text);
+    user-select: none;
+  }
+  .node-body{
+    width:100%; height:100%;
+    display:flex; align-items:center; justify-content:center;
+    text-align:center; cursor: grab;
+  }
+  .node.shape-terminal{ width:126px; min-height:42px; }
+  .node.shape-terminal .node-body{
+    padding: 9px 20px; border-radius:999px;
+    background: var(--bg-2); border: 1.5px solid var(--accent-dim); color: var(--accent); font-weight:600;
+    cursor: default;
+  }
+  .node.shape-rect{ width:178px; min-height:64px; }
+  .node.shape-rect .node-body{
+    padding: 10px 14px; border-radius:6px;
+    background: var(--panel-2); border: 1.5px solid var(--accent-dim);
+  }
+  .node.shape-diamond{ width:140px; height:108px; }
+  .node.shape-diamond .diamond-visual{
+    position:absolute; inset: 8px 20px;
+    background: var(--panel-2); border: 1.5px solid var(--trace-dim);
+    transform: rotate(45deg); border-radius:8px;
+  }
+  .node.shape-diamond .node-body{ position:relative; z-index:1; padding: 0 14px; pointer-events:none; }
+
+  .node .del-btn{
+    position:absolute; top:-9px; right:-9px; z-index:3;
+    width:20px; height:20px; border-radius:50%;
+    background: var(--bg-2); border: 1.5px solid var(--error);
+    color: var(--error); font-size: 12px; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .node .del-btn:hover{ background: var(--error); color: var(--bg-2); }
+
+  .port{
+    position:absolute; z-index:4;
+    width:16px; height:16px; margin:-8px 0 0 -8px;
+    border-radius:50%;
+    background: var(--accent); border: 2px solid var(--bg-2);
+    cursor: crosshair;
+  }
+  .port.ja{ background: var(--success); }
+  .port.nein{ background: var(--error); }
+  .port::after{
+    content: attr(data-label);
+    position:absolute; top:16px; left:50%; transform:translateX(-50%);
+    font-size:9.5px; white-space:nowrap; color: var(--text-dim);
+  }
+
+  /* ---------- Tray ---------- */
+  .tray-label{ font-size: 12px; color: var(--text-dim); margin: 6px 0 10px; }
+  .tray{
+    display:flex; flex-wrap:wrap; gap:10px; min-height: 50px;
+    padding: 12px; background: var(--bg-2); border: 1px dashed var(--line);
+    border-radius: var(--radius); margin-bottom: 22px;
+  }
+  .tray:empty::after{ content: "Alle Bausteine sind platziert."; color: var(--text-dim); font-size: 12px; font-style: italic; }
+  .chip{
+    display:flex; align-items:center; gap:7px; padding: 9px 14px;
+    background: var(--panel-2); border: 1.5px solid var(--accent-dim);
+    border-left: 4px solid var(--accent); border-radius: 6px; font-size: 12.5px;
+    cursor: grab; user-select: none; touch-action: none; box-shadow: 0 1px 0 rgba(0,0,0,0.15);
+  }
+  .chip.chip-diamond{ border-color: var(--trace-dim); border-left-color: var(--trace); }
+  .chip .shape-icon{ font-size: 13px; opacity: .8; }
+  .chip-ghost{
+    position: fixed; z-index: 999; pointer-events:none; opacity: 0.92;
+    transform: translate(-50%,-50%) scale(1.03); box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  }
+
+  /* ---------- Actions ---------- */
+  .actions{ display:flex; flex-wrap:wrap; gap: 12px; align-items:center; margin-bottom: 14px; }
+  button{
+    font-family: var(--mono); font-size: 13px; font-weight: 600; padding: 11px 20px;
+    border-radius: var(--radius); border: 1px solid var(--accent-dim);
+    background: var(--accent); color: var(--bg-2); cursor:pointer; letter-spacing:.02em;
+  }
+  button:hover{ filter: brightness(1.08); }
+  button.btn-secondary{ background: none; color: var(--text-dim); border-color: var(--line); }
+  button.btn-secondary:hover{ color: var(--text); border-color: var(--accent-dim); }
+
+  /* ---------- Feedback ---------- */
+  .feedback-summary{ font-size: 13px; margin-bottom: 10px; min-height:18px; }
+  .feedback-summary.ok{ color: var(--success); }
+  .feedback-summary.bad{ color: var(--error); }
+
+  .truth-table{ width:100%; border-collapse: collapse; font-size: 12.5px; margin-top: 6px; }
+  .truth-table th, .truth-table td{
+    border: 1px solid var(--line); padding: 8px 10px; text-align:left;
+  }
+  .truth-table th{ color: var(--trace); font-weight:600; background: var(--bg-2); }
+  .truth-table td.status-ok{ color: var(--success); font-weight:600; }
+  .truth-table td.status-bad{ color: var(--error); font-weight:600; }
+  .truth-table .reason{ color: var(--text-dim); font-size: 11.5px; }
+
+  .done-banner{
+    margin-top:16px; padding: 14px 16px; border-radius: var(--radius);
+    background: rgba(95,208,104,0.1); border: 1px solid var(--success); color: var(--success);
+    font-size: 13.5px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="eyebrow"><span class="dot"></span>INFORMATIK · KLASSE 10</div>
+  <h1>Programmablaufplan frei bauen</h1>
+  <p class="subtitle">Baue diesmal den kompletten Ablaufplan selbst: Ziehe die Bausteine auf die Fläche und verbinde sie per Pfeil in der richtigen Reihenfolge – inklusive der ja/nein-Abzweigungen bei den Rauten.</p>
+
+  <div class="panel" id="panel"></div>
+</div>
+
+<script>
+(function(){
+
+  // ---------------- Scenario ----------------
+  var SCENARIO = {
+    eyebrow: 'DIEBSTAHLSICHERUNG · ZWEI TASTER',
+    title: 'Box mit Deckel- und Boden-Taster',
+    scenario: 'Eine Box hat zwei Taster: einen am Deckel und einen am Boden. Nur wenn BEIDE Taster gleichzeitig gedrückt sind, gilt die Box als korrekt verschlossen und die grüne LED leuchtet. Ist mindestens einer der beiden Taster nicht gedrückt, blinkt stattdessen die rote LED als Warnung. Baue den passenden Programmablaufplan.'
+  };
+
+  var PALETTE = [
+    { id:'b1', shape:'diamond', label:'Taster Deckel gedrückt?' },
+    { id:'b2', shape:'diamond', label:'Taster Boden gedrückt?' },
+    { id:'b3', shape:'rect', label:'LED grün leuchten lassen' },
+    { id:'b4', shape:'rect', label:'LED rot blinken lassen' },
+    { id:'b5', shape:'rect', label:'LED rot blinken lassen' }
+  ];
+
+  var CONDITION_KEY = {
+    'Taster Deckel gedrückt?': 'deckel',
+    'Taster Boden gedrückt?': 'boden'
+  };
+
+  var COMBOS = [
+    { deckel:true,  boden:true,  expected:'LED grün leuchten lassen' },
+    { deckel:true,  boden:false, expected:'LED rot blinken lassen' },
+    { deckel:false, boden:true,  expected:'LED rot blinken lassen' },
+    { deckel:false, boden:false, expected:'LED rot blinken lassen' }
+  ];
+
+  // ---------------- State ----------------
+  var nodeCounter = 0;
+  var edgeCounter = 0;
+
+  var state = {
+    nodes: {},       // id -> {id,shape,label,x,y,fixed,chipId}
+    edges: [],        // {id, fromId, fromPort, toId}
+    palette: PALETTE.map(function(p){ return { id:p.id, shape:p.shape, label:p.label, placed:false, nodeId:null }; }),
+    solved: false
+  };
+
+  function resetState(){
+    state.nodes = {
+      start: { id:'start', shape:'terminal', label:'Start', x:297, y:16, fixed:true },
+      ende:  { id:'ende',  shape:'terminal', label:'Ende',  x:297, y:594, fixed:true }
+    };
+    state.edges = [];
+    state.palette = PALETTE.map(function(p){ return { id:p.id, shape:p.shape, label:p.label, placed:false, nodeId:null }; });
+    state.solved = false;
+  }
+  resetState();
+
+  var panelEl = document.getElementById('panel');
+  var nodeEls = {};   // nodeId -> DOM element
+  var portEls = {};   // nodeId+':'+port -> DOM element
+  var canvasWrap, canvasSvg, trayEl, feedbackSummaryEl, feedbackDetailEl;
+
+  function escapeHtml(str){
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function getPorts(node){
+    if (node.shape === 'rect') return [{ key:'out', xPct:50, yPct:100, cls:'', label:'' }];
+    if (node.shape === 'diamond') return [
+      { key:'ja', xPct:22, yPct:100, cls:'ja', label:'ja' },
+      { key:'nein', xPct:78, yPct:100, cls:'nein', label:'nein' }
+    ];
+    if (node.shape === 'terminal' && node.id === 'start') return [{ key:'out', xPct:50, yPct:100, cls:'', label:'' }];
+    return [];
+  }
+
+  function outEdge(nodeId, port){
+    return state.edges.filter(function(e){ return e.fromId === nodeId && e.fromPort === port; })[0] || null;
+  }
+
+  function removeOutEdge(nodeId, port){
+    state.edges = state.edges.filter(function(e){ return !(e.fromId === nodeId && e.fromPort === port); });
+  }
+
+  // ---------------- Simulation ----------------
+  function simulate(deckel, boden){
+    var cur = state.nodes.start;
+    var actions = [];
+    var steps = 0;
+    while (true){
+      steps++;
+      if (steps > 25) return { ok:false, reason:'loop' };
+
+      if (cur.id === 'ende') return { ok:true, actions: actions };
+
+      if (cur.shape === 'terminal' && cur.id === 'start'){
+        var e0 = outEdge('start', 'out');
+        if (!e0) return { ok:false, reason:'start-unconnected' };
+        cur = state.nodes[e0.toId];
+        continue;
+      }
+
+      if (cur.shape === 'diamond'){
+        var key = CONDITION_KEY[cur.label];
+        var val = key === 'deckel' ? deckel : boden;
+        var port = val ? 'ja' : 'nein';
+        var e1 = outEdge(cur.id, port);
+        if (!e1) return { ok:false, reason:'missing-edge', node: cur, port: port };
+        cur = state.nodes[e1.toId];
+        continue;
+      }
+
+      if (cur.shape === 'rect'){
+        actions.push(cur.label);
+        var e2 = outEdge(cur.id, 'out');
+        if (!e2) return { ok:false, reason:'dead-end', node: cur };
+        cur = state.nodes[e2.toId];
+        continue;
+      }
+
+      return { ok:false, reason:'unknown' };
+    }
+  }
+
+  function reasonText(result){
+    if (result.reason === 'start-unconnected') return 'Start ist mit keinem Baustein verbunden.';
+    if (result.reason === 'missing-edge') return 'Bei „' + result.node.label + '“ fehlt der Pfeil für „' + (result.port === 'ja' ? 'ja' : 'nein') + '“.';
+    if (result.reason === 'dead-end') return 'Bei „' + result.node.label + '“ geht kein Pfeil weiter.';
+    if (result.reason === 'loop') return 'Der Plan führt in eine Endlosschleife.';
+    return 'Unbekannter Fehler im Plan.';
+  }
+
+  function evaluateCombo(combo){
+    var result = simulate(combo.deckel, combo.boden);
+    if (!result.ok){
+      return { pass:false, message: reasonText(result) };
+    }
+    if (result.actions.length === 0){
+      return { pass:false, message: 'Der Plan erreicht „Ende“, ohne eine LED-Aktion auszuführen.' };
+    }
+    if (result.actions.length > 1){
+      return { pass:false, message: 'Der Plan führt mehrere Aktionen aus (' + result.actions.join(', ') + ') statt nur einer.' };
+    }
+    if (result.actions[0] !== combo.expected){
+      return { pass:false, message: 'Falsche Aktion: „' + result.actions[0] + '“ statt „' + combo.expected + '“.' };
+    }
+    return { pass:true, message: '' };
+  }
+
+  // ---------------- Node creation / deletion ----------------
+  function createNode(chip, x, y){
+    var id = 'n' + (nodeCounter++);
+    var node = { id:id, shape: chip.shape, label: chip.label, x:x, y:y, fixed:false, chipId: chip.id };
+    state.nodes[id] = node;
+    chip.placed = true;
+    chip.nodeId = id;
+    return node;
+  }
+
+  function deleteNode(nodeId){
+    var node = state.nodes[nodeId];
+    if (!node || node.fixed) return;
+    state.edges = state.edges.filter(function(e){ return e.fromId !== nodeId && e.toId !== nodeId; });
+    delete state.nodes[nodeId];
+    var chip = state.palette.filter(function(c){ return c.id === node.chipId; })[0];
+    if (chip){ chip.placed = false; chip.nodeId = null; }
+
+    var el = nodeEls[nodeId];
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    delete nodeEls[nodeId];
+    Object.keys(portEls).forEach(function(k){
+      if (k.indexOf(nodeId + ':') === 0) delete portEls[k];
+    });
+
+    renderTray();
+    renderEdges();
+    clearFeedback();
+  }
+
+  // ---------------- DOM: node element ----------------
+  function createNodeEl(node){
+    var el = document.createElement('div');
+    el.className = 'node shape-' + node.shape;
+    el.dataset.nodeId = node.id;
+    el.style.left = node.x + 'px';
+    el.style.top = node.y + 'px';
+
+    if (node.shape === 'diamond'){
+      var visual = document.createElement('div');
+      visual.className = 'diamond-visual';
+      el.appendChild(visual);
+    }
+
+    var body = document.createElement('div');
+    body.className = 'node-body';
+    body.textContent = node.label;
+    el.appendChild(body);
+
+    if (!node.fixed){
+      var del = document.createElement('div');
+      del.className = 'del-btn';
+      del.textContent = '×';
+      del.addEventListener('pointerdown', function(ev){ ev.stopPropagation(); });
+      del.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        deleteNode(node.id);
+      });
+      el.appendChild(del);
+
+      attachNodeDrag(el, node);
+    }
+
+    getPorts(node).forEach(function(p){
+      var portEl = document.createElement('div');
+      portEl.className = 'port' + (p.cls ? ' ' + p.cls : '');
+      portEl.style.left = p.xPct + '%';
+      portEl.style.top = p.yPct + '%';
+      if (p.label) portEl.dataset.label = p.label;
+      portEl.dataset.nodeId = node.id;
+      portEl.dataset.port = p.key;
+      attachPortDrag(portEl, node, p.key);
+      el.appendChild(portEl);
+      portEls[node.id + ':' + p.key] = portEl;
+    });
+
+    nodeEls[node.id] = el;
+    return el;
+  }
+
+  function attachNodeDrag(el, node){
+    el.querySelector('.node-body').addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      var startX = e.clientX, startY = e.clientY;
+      var origX = node.x, origY = node.y;
+      var moved = false;
+
+      function onMove(ev){
+        var dx = ev.clientX - startX;
+        var dy = ev.clientY - startY;
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true;
+        node.x = origX + dx;
+        node.y = origY + dy;
+        el.style.left = node.x + 'px';
+        el.style.top = node.y + 'px';
+        renderEdges();
+      }
+      function onUp(){
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+      }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+  }
+
+  var previewPath = null;
+
+  function attachPortDrag(portEl, node, portKey){
+    portEl.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+
+      var wrapRect = canvasWrap.getBoundingClientRect();
+      var startRect = portEl.getBoundingClientRect();
+      var startX = startRect.left + startRect.width / 2 - wrapRect.left;
+      var startY = startRect.top + startRect.height / 2 - wrapRect.top;
+
+      previewPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      previewPath.setAttribute('class', 'preview-path');
+      canvasSvg.appendChild(previewPath);
+
+      function updatePreview(cx, cy){
+        previewPath.setAttribute('d', 'M ' + startX + ' ' + startY + ' L ' + cx + ' ' + cy);
+      }
+      updatePreview(startX, startY);
+
+      function onMove(ev){
+        var cx = ev.clientX - wrapRect.left;
+        var cy = ev.clientY - wrapRect.top;
+        updatePreview(cx, cy);
+      }
+
+      function onUp(ev){
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        if (previewPath && previewPath.parentNode) previewPath.parentNode.removeChild(previewPath);
+        previewPath = null;
+
+        var targetEl = document.elementFromPoint(ev.clientX, ev.clientY);
+        var targetNodeEl = targetEl ? targetEl.closest('.node') : null;
+        if (targetNodeEl){
+          var targetId = targetNodeEl.dataset.nodeId;
+          if (targetId && targetId !== node.id){
+            removeOutEdge(node.id, portKey);
+            state.edges.push({ id:'e' + (edgeCounter++), fromId: node.id, fromPort: portKey, toId: targetId });
+            renderEdges();
+            clearFeedback();
+          }
+        }
+      }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+  }
+
+  // ---------------- Edge rendering ----------------
+  // Find where a line from (x1,y1) towards (x2,y2) first crosses the
+  // boundary of the given rect, so an arrowhead can sit visibly on the
+  // target's edge instead of being hidden inside its (opaque) box.
+  function rectEntryPoint(x1, y1, x2, y2, rect){
+    var dx = x2 - x1, dy = y2 - y1;
+    var candidates = [];
+    function consider(t, x, y){ if (t > 0 && t <= 1) candidates.push({ t:t, x:x, y:y }); }
+    if (dx !== 0){
+      var t1 = (rect.left - x1) / dx;
+      var y1c = y1 + t1 * dy;
+      if (y1c >= rect.top && y1c <= rect.bottom) consider(t1, rect.left, y1c);
+      var t2 = (rect.right - x1) / dx;
+      var y2c = y1 + t2 * dy;
+      if (y2c >= rect.top && y2c <= rect.bottom) consider(t2, rect.right, y2c);
+    }
+    if (dy !== 0){
+      var t3 = (rect.top - y1) / dy;
+      var x3c = x1 + t3 * dx;
+      if (x3c >= rect.left && x3c <= rect.right) consider(t3, x3c, rect.top);
+      var t4 = (rect.bottom - y1) / dy;
+      var x4c = x1 + t4 * dx;
+      if (x4c >= rect.left && x4c <= rect.right) consider(t4, x4c, rect.bottom);
+    }
+    if (!candidates.length) return { x:x2, y:y2 };
+    candidates.sort(function(a,b){ return a.t - b.t; });
+    return { x: candidates[0].x, y: candidates[0].y };
+  }
+
+  function renderEdges(){
+    if (!canvasSvg) return;
+    var wrapRect = canvasWrap.getBoundingClientRect();
+
+    // remove existing rendered edges (keep defs)
+    [...canvasSvg.querySelectorAll('.edge-path, .edge-hit')].forEach(function(p){ p.remove(); });
+
+    state.edges.forEach(function(edge){
+      var portEl = portEls[edge.fromId + ':' + edge.fromPort];
+      var targetEl = nodeEls[edge.toId];
+      if (!portEl || !targetEl) return;
+
+      var pr = portEl.getBoundingClientRect();
+      var tr = targetEl.getBoundingClientRect();
+      var x1 = pr.left + pr.width / 2 - wrapRect.left;
+      var y1 = pr.top + pr.height / 2 - wrapRect.top;
+      var cx2 = tr.left + tr.width / 2 - wrapRect.left;
+      var cy2 = tr.top + tr.height / 2 - wrapRect.top;
+      var targetRect = {
+        left: tr.left - wrapRect.left,
+        top: tr.top - wrapRect.top,
+        right: tr.left - wrapRect.left + tr.width,
+        bottom: tr.top - wrapRect.top + tr.height
+      };
+      var entry = rectEntryPoint(x1, y1, cx2, cy2, targetRect);
+      var x2 = entry.x, y2 = entry.y;
+
+      var d = 'M ' + x1 + ' ' + y1 + ' L ' + x2 + ' ' + y2;
+
+      var hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      hit.setAttribute('d', d);
+      hit.setAttribute('class', 'edge-hit');
+      hit.style.pointerEvents = 'stroke';
+      hit.addEventListener('pointerdown', function(ev){
+        ev.stopPropagation();
+        state.edges = state.edges.filter(function(e){ return e.id !== edge.id; });
+        renderEdges();
+        clearFeedback();
+      });
+      canvasSvg.appendChild(hit);
+
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+      var cls = 'edge-path';
+      var marker = 'url(#arrow)';
+      if (edge.fromPort === 'ja'){ cls += ' ja'; marker = 'url(#arrow-ja)'; }
+      if (edge.fromPort === 'nein'){ cls += ' nein'; marker = 'url(#arrow-nein)'; }
+      path.setAttribute('class', cls);
+      path.setAttribute('marker-end', marker);
+      canvasSvg.appendChild(path);
+    });
+  }
+
+  function ensureSvgDefs(){
+    canvasSvg.innerHTML =
+      '<defs>' +
+      '<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">' +
+      '<path d="M0,0 L10,5 L0,10 z" fill="var(--trace-dim)"></path></marker>' +
+      '<marker id="arrow-ja" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">' +
+      '<path d="M0,0 L10,5 L0,10 z" fill="var(--success)"></path></marker>' +
+      '<marker id="arrow-nein" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">' +
+      '<path d="M0,0 L10,5 L0,10 z" fill="var(--error)"></path></marker>' +
+      '</defs>';
+  }
+
+  // ---------------- Tray ----------------
+  function renderTray(){
+    trayEl.innerHTML = '';
+    state.palette.forEach(function(chip){
+      if (chip.placed) return;
+      var el = document.createElement('div');
+      el.className = 'chip' + (chip.shape === 'diamond' ? ' chip-diamond' : '');
+      el.dataset.chipId = chip.id;
+      var icon = chip.shape === 'diamond' ? '&#9671;' : '&#9646;';
+      el.innerHTML = '<span class="shape-icon">' + icon + '</span><span>' + escapeHtml(chip.label) + '</span>';
+      attachChipDrag(el, chip);
+      trayEl.appendChild(el);
+    });
+  }
+
+  function attachChipDrag(chipEl, chip){
+    chipEl.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      var ghost = chipEl.cloneNode(true);
+      ghost.classList.add('chip-ghost');
+      var rect = chipEl.getBoundingClientRect();
+      ghost.style.width = rect.width + 'px';
+      ghost.style.left = e.clientX + 'px';
+      ghost.style.top = e.clientY + 'px';
+      document.body.appendChild(ghost);
+      chipEl.style.opacity = '0.25';
+
+      function onMove(ev){
+        ghost.style.left = ev.clientX + 'px';
+        ghost.style.top = ev.clientY + 'px';
+      }
+      function onUp(ev){
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        ghost.remove();
+        chipEl.style.opacity = '';
+
+        var wrapRect = canvasWrap.getBoundingClientRect();
+        var inside = ev.clientX >= wrapRect.left && ev.clientX <= wrapRect.right &&
+                     ev.clientY >= wrapRect.top && ev.clientY <= wrapRect.bottom;
+        if (inside){
+          var relX = ev.clientX - wrapRect.left - 85;
+          var relY = ev.clientY - wrapRect.top - 30;
+          relX = Math.max(4, Math.min(relX, wrapRect.width - 190));
+          relY = Math.max(4, Math.min(relY, wrapRect.height - 90));
+          var node = createNode(chip, relX, relY);
+          var nodeEl = createNodeEl(node);
+          canvasWrap.appendChild(nodeEl);
+          renderTray();
+          renderEdges();
+          clearFeedback();
+        }
+      }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+  }
+
+  // ---------------- Check / reset / feedback ----------------
+  function clearFeedback(){
+    feedbackSummaryEl.textContent = '';
+    feedbackSummaryEl.className = 'feedback-summary';
+    feedbackDetailEl.innerHTML = '';
+  }
+
+  function checkPlan(){
+    var results = COMBOS.map(function(combo){
+      var r = evaluateCombo(combo);
+      return { combo: combo, pass: r.pass, message: r.message };
+    });
+    var allPass = results.every(function(r){ return r.pass; });
+
+    var table = document.createElement('table');
+    table.className = 'truth-table';
+    table.innerHTML =
+      '<tr><th>Deckel-Taster</th><th>Boden-Taster</th><th>Ergebnis</th></tr>' +
+      results.map(function(r){
+        var statusCls = r.pass ? 'status-ok' : 'status-bad';
+        var statusText = r.pass ? '✓ richtig (' + r.combo.expected + ')' : '✗ ' + r.message;
+        return '<tr>' +
+          '<td>' + (r.combo.deckel ? 'gedrückt' : 'nicht gedrückt') + '</td>' +
+          '<td>' + (r.combo.boden ? 'gedrückt' : 'nicht gedrückt') + '</td>' +
+          '<td class="' + statusCls + '">' + statusText + '</td>' +
+          '</tr>';
+      }).join('');
+
+    feedbackDetailEl.innerHTML = '';
+    feedbackDetailEl.appendChild(table);
+
+    if (allPass){
+      feedbackSummaryEl.textContent = 'Richtig! Der Plan verhält sich für alle vier Kombinationen korrekt.';
+      feedbackSummaryEl.className = 'feedback-summary ok';
+      state.solved = true;
+      renderDoneBanner();
+    } else {
+      feedbackSummaryEl.textContent = 'Noch nicht ganz – schau dir die rot markierten Fälle in der Tabelle an.';
+      feedbackSummaryEl.className = 'feedback-summary bad';
+      removeDoneBanner();
+    }
+  }
+
+  function renderDoneBanner(){
+    removeDoneBanner();
+    var banner = document.createElement('div');
+    banner.className = 'done-banner';
+    banner.id = 'doneBanner';
+    banner.textContent = '🎉 Geschafft! Dein Programmablaufplan funktioniert für alle vier Fälle richtig.';
+    panelEl.appendChild(banner);
+  }
+  function removeDoneBanner(){
+    var b = document.getElementById('doneBanner');
+    if (b) b.remove();
+  }
+
+  function resetAll(){
+    Object.keys(nodeEls).forEach(function(id){
+      if (state.nodes[id] && !state.nodes[id].fixed){
+        var el = nodeEls[id];
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      }
+    });
+    resetState();
+    nodeEls = {};
+    portEls = {};
+    buildFixedNodes();
+    renderTray();
+    renderEdges();
+    clearFeedback();
+    removeDoneBanner();
+  }
+
+  function buildFixedNodes(){
+    ['start', 'ende'].forEach(function(id){
+      var node = state.nodes[id];
+      var el = createNodeEl(node);
+      canvasWrap.appendChild(el);
+    });
+  }
+
+  // ---------------- Panel assembly ----------------
+  function renderPanel(){
+    panelEl.innerHTML = '';
+
+    var eyebrow = document.createElement('div');
+    eyebrow.className = 'task-eyebrow';
+    eyebrow.textContent = SCENARIO.eyebrow;
+    panelEl.appendChild(eyebrow);
+
+    var title = document.createElement('div');
+    title.className = 'task-title';
+    title.textContent = SCENARIO.title;
+    panelEl.appendChild(title);
+
+    var scenario = document.createElement('p');
+    scenario.className = 'scenario';
+    scenario.textContent = SCENARIO.scenario;
+    panelEl.appendChild(scenario);
+
+    var howto = document.createElement('div');
+    howto.className = 'howto';
+    howto.innerHTML =
+      '<b>So geht’s:</b> Ziehe die Bausteine unten auf die Fläche. Zieh dann von einem Punkt am unteren Rand eines Bausteins eine Verbindung zum nächsten Baustein. ' +
+      'Rauten haben zwei Punkte: <span class="legend"><span class="legend-dot ja"></span>ja</span><span class="legend"><span class="legend-dot nein"></span>nein</span>' +
+      'Auf eine Verbindungslinie klicken löscht sie wieder; auf das Kreuz an einem Baustein klicken entfernt ihn.';
+    panelEl.appendChild(howto);
+
+    canvasWrap = document.createElement('div');
+    canvasWrap.className = 'canvas-wrap';
+    canvasSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    canvasSvg.setAttribute('class', 'canvas-svg');
+    canvasWrap.appendChild(canvasSvg);
+    ensureSvgDefs();
+    panelEl.appendChild(canvasWrap);
+
+    buildFixedNodes();
+
+    // re-create any already-placed custom nodes (e.g. after a resize re-render, not typical here)
+    Object.keys(state.nodes).forEach(function(id){
+      var node = state.nodes[id];
+      if (!node.fixed && !nodeEls[id]){
+        var el = createNodeEl(node);
+        canvasWrap.appendChild(el);
+      }
+    });
+
+    var trayLabel = document.createElement('div');
+    trayLabel.className = 'tray-label';
+    trayLabel.textContent = 'Bausteine – ziehe sie auf die Fläche:';
+    panelEl.appendChild(trayLabel);
+
+    trayEl = document.createElement('div');
+    trayEl.className = 'tray';
+    trayEl.id = 'tray';
+    panelEl.appendChild(trayEl);
+    renderTray();
+
+    var actions = document.createElement('div');
+    actions.className = 'actions';
+
+    var checkBtn = document.createElement('button');
+    checkBtn.id = 'checkBtn';
+    checkBtn.textContent = 'Prüfen';
+    checkBtn.addEventListener('click', checkPlan);
+
+    var resetBtn = document.createElement('button');
+    resetBtn.className = 'btn-secondary';
+    resetBtn.id = 'resetBtn';
+    resetBtn.textContent = 'Zurücksetzen';
+    resetBtn.addEventListener('click', resetAll);
+
+    actions.appendChild(checkBtn);
+    actions.appendChild(resetBtn);
+    panelEl.appendChild(actions);
+
+    feedbackSummaryEl = document.createElement('div');
+    feedbackSummaryEl.className = 'feedback-summary';
+    feedbackSummaryEl.id = 'feedbackSummary';
+    panelEl.appendChild(feedbackSummaryEl);
+
+    feedbackDetailEl = document.createElement('div');
+    feedbackDetailEl.id = 'feedbackDetail';
+    panelEl.appendChild(feedbackDetailEl);
+
+    requestAnimationFrame(renderEdges);
+    window.addEventListener('resize', renderEdges);
+  }
+
+  renderPanel();
+})();
+</script>
+</body>
+</html>

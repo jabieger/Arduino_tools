@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vom Programmablaufplan zum Code · Klasse 10</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0f2027;
+    --bg-2: #0b191f;
+    --panel: #16333b;
+    --panel-2: #1c3e46;
+    --line: #274a52;
+    --trace: #c08552;
+    --trace-dim: #7a5a3d;
+    --accent: #4fd1c5;
+    --accent-dim: #2e6b66;
+    --text: #edeae1;
+    --text-dim: #9fb3b0;
+    --success: #5fd068;
+    --success-glow: rgba(95,208,104,0.35);
+    --error: #e2665a;
+    --error-glow: rgba(226,102,90,0.35);
+    --radius: 6px;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html,body{
+    margin:0; padding:0; min-height:100%;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(79,209,197,0.06), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(192,133,82,0.08), transparent 45%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    line-height: 1.55;
+  }
+
+  body{ display:flex; justify-content:center; padding: 32px 16px 64px; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  .app{ width:100%; max-width: 980px; }
+
+  .eyebrow{
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--trace);
+    display:flex; align-items:center; gap:10px; margin-bottom: 10px;
+  }
+  .eyebrow .dot{ width:7px; height:7px; border-radius:50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+  h1{ font-family: var(--display); font-weight:700; font-size: clamp(26px, 5vw, 34px); margin: 0 0 6px; letter-spacing: -0.01em; }
+  .subtitle{ color: var(--text-dim); font-size: 14.5px; margin: 0 0 26px; max-width: 68ch; }
+
+  /* ---------- Progress strip ---------- */
+  .strip{
+    position:relative; display:flex; align-items:center; justify-content:center; gap: 0;
+    padding: 14px 10px; margin-bottom: 22px;
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  .strip::before{
+    content:""; position:absolute; left:60px; right:60px; top:50%; height:2px;
+    background: repeating-linear-gradient(90deg, var(--trace-dim) 0 6px, transparent 6px 10px);
+    transform: translateY(-50%); z-index:0;
+  }
+  .task-btn{
+    background:none; border:none; display:flex; flex-direction:column; align-items:center; gap:6px;
+    cursor:pointer; padding: 4px 26px; position:relative; z-index:1; font-family: var(--mono); color: var(--text-dim);
+  }
+  .task-btn .led{ width:16px; height:16px; border-radius:50%; background: var(--bg-2); border: 2px solid var(--line); transition: all .2s ease; }
+  .task-btn .num{ font-size: 11px; letter-spacing:.05em; }
+  .task-btn.current .led{ border-color: var(--accent); background: var(--accent); box-shadow: 0 0 10px var(--accent), 0 0 2px var(--accent); }
+  .task-btn.current .num{ color: var(--accent); font-weight:600; }
+  .task-btn.solved .led{ border-color: var(--success); background: var(--success); box-shadow: 0 0 8px var(--success-glow); }
+  .task-btn.solved .num{ color: var(--success); }
+  .task-btn:hover .led{ border-color: var(--accent); }
+
+  /* ---------- Panel ---------- */
+  .panel{
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 22px 26px;
+  }
+  .task-eyebrow{ font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--trace); margin-bottom: 8px; }
+  .task-title{ font-family: var(--display); font-weight:600; font-size: 20px; margin: 0 0 10px; }
+  .scenario{ color: var(--text-dim); font-size: 13.5px; margin: 0 0 18px; max-width: 78ch; }
+
+  .step-counter{ font-size: 12px; color: var(--accent); margin-bottom: 14px; }
+
+  /* ---------- Dual layout ---------- */
+  .dual-wrap{ display:flex; gap: 18px; align-items:flex-start; flex-wrap: wrap; margin-bottom: 18px; }
+  .diagram-col{ flex: 1 1 300px; min-width: 260px; }
+  .code-col{ flex: 1 1 380px; min-width: 300px; }
+  .col-label{ font-size: 11.5px; letter-spacing:.1em; text-transform:uppercase; color: var(--text-dim); margin-bottom: 8px; }
+
+  /* ---------- Diagram (read-only) ---------- */
+  .flow-wrap{ position: relative; padding: 4px 4px 14px; }
+  .flow-svg{ position:absolute; top:0; left:0; pointer-events:none; z-index:0; overflow:visible; }
+  .edge-path{ fill:none; stroke: var(--trace-dim); stroke-width: 1.6; stroke-dasharray: 5 4; }
+  .edge-path.yes{ stroke: var(--success); stroke-dasharray:none; }
+  .edge-path.no{ stroke: var(--error); stroke-dasharray:none; }
+  .edge-label{ font-family: var(--mono); font-size: 10.5px; font-weight:600; }
+  .edge-label.yes{ fill: var(--success); }
+  .edge-label.no{ fill: var(--error); }
+
+  .flow-main{ position: relative; z-index: 1; display:flex; flex-direction:column; align-items:center; gap: 26px; margin: 0 auto; }
+  .branch-row{ display:flex; gap: 20px; align-items:flex-start; justify-content:center; }
+  .branch-col{ display:flex; flex-direction:column; align-items:center; gap: 26px; }
+
+  .term{
+    padding: 7px 22px; border-radius: 999px; background: var(--bg-2); border: 1.5px solid var(--accent-dim);
+    color: var(--accent); font-weight: 600; font-size: 12px; white-space: nowrap;
+  }
+
+  .flownode{
+    font-family: var(--mono); font-size: 11.5px; color: var(--text); text-align:center;
+    transition: box-shadow .2s ease, border-color .2s ease, opacity .2s ease;
+  }
+  .flownode.shape-rect{
+    min-width: 150px; max-width: 190px; padding: 10px 12px; border: 2px solid var(--line);
+    border-radius: 6px; background: var(--bg-2);
+  }
+  .flownode.shape-diamond{
+    width: 108px; height: 108px; border: 2px solid var(--line); border-radius: 10px;
+    background: var(--bg-2); transform: rotate(45deg); display:flex; align-items:center; justify-content:center;
+  }
+  .flownode.shape-diamond .fn-inner{ transform: rotate(-45deg); width: 78px; text-align:center; line-height:1.2; }
+  .merge-dot{ width: 8px; height:8px; border-radius:50%; background: var(--trace-dim); }
+
+  .flownode.pending{ opacity: .55; }
+  .flownode.current{
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px var(--success-glow), 0 0 14px rgba(79,209,197,0.4);
+    opacity: 1;
+  }
+  .flownode.done{ border-color: var(--success) !important; background: rgba(95,208,104,0.08); opacity: 1; }
+
+  /* ---------- Code panel ---------- */
+  .code-box{
+    background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 16px; font-family: var(--mono); font-size: 12.5px; overflow-x:auto;
+  }
+  .code-line{ white-space: pre; min-height: 20px; line-height: 1.9; }
+  .code-line.fixed{ color: var(--text-dim); }
+  .code-line .indent{ display:inline-block; }
+
+  .code-slot{
+    display:inline-flex; align-items:center; border-radius:4px; padding: 1px 8px;
+    font-family: var(--mono); font-size:12.5px; cursor:default;
+  }
+  .code-slot.locked{
+    border: 1.5px dashed var(--line); color: var(--text-dim); opacity:.5;
+  }
+  .code-slot.active{
+    border: 1.5px dashed var(--accent); color: var(--text-dim); background: rgba(79,209,197,0.06);
+  }
+  .code-slot.filled{
+    border-left: 3px solid var(--success); border-top:none;border-right:none;border-bottom:none;
+    color: var(--text); background: rgba(95,208,104,0.08); padding-left:8px;
+  }
+  .code-slot.wrong-flash{
+    border: 1.5px solid var(--error) !important; background: rgba(226,102,90,0.15) !important;
+  }
+
+  /* ---------- Tray ---------- */
+  .tray-label{ font-size: 12px; color: var(--text-dim); margin: 6px 0 10px; }
+  .tray{
+    display:flex; flex-wrap:wrap; gap:10px; min-height: 50px; padding: 12px;
+    background: var(--bg-2); border: 1px dashed var(--line); border-radius: var(--radius); margin-bottom: 18px;
+  }
+  .tray:empty::after{ content: "Alle Codezeilen sind platziert."; color: var(--text-dim); font-size: 12px; font-style: italic; }
+  .chip{
+    display:flex; align-items:center; gap:7px; padding: 9px 14px;
+    background: var(--panel-2); border: 1.5px solid var(--accent-dim); border-left: 4px solid var(--accent);
+    border-radius: 6px; font-size: 12.5px; font-family: var(--mono);
+    cursor: grab; user-select: none; touch-action: none; box-shadow: 0 1px 0 rgba(0,0,0,0.15);
+  }
+  .chip-ghost{
+    position: fixed; z-index: 999; pointer-events:none; opacity: 0.92;
+    transform: translate(-50%,-50%) scale(1.03); box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  }
+
+  /* ---------- Actions / feedback ---------- */
+  .actions{ display:flex; flex-wrap:wrap; gap: 12px; align-items:center; }
+  button{
+    font-family: var(--mono); font-size: 13px; font-weight: 600; padding: 11px 20px;
+    border-radius: var(--radius); border: 1px solid var(--accent-dim);
+    background: var(--accent); color: var(--bg-2); cursor:pointer; letter-spacing:.02em;
+  }
+  button:hover{ filter: brightness(1.08); }
+  button.btn-secondary{ background: none; color: var(--text-dim); border-color: var(--line); }
+  button.btn-secondary:hover{ color: var(--text); border-color: var(--accent-dim); }
+  button[hidden]{ display:none; }
+
+  .feedback{ margin-top: 14px; font-size: 13px; min-height: 18px; }
+  .feedback.ok{ color: var(--success); }
+  .feedback.bad{ color: var(--error); }
+
+  .done-panel{ text-align:center; padding: 20px 10px 10px; }
+  .done-emoji{ font-size: 40px; margin-bottom: 10px; }
+  .done-title{ font-family: var(--display); font-weight:700; font-size: 22px; margin: 0 0 8px; }
+  .done-text{ color: var(--text-dim); font-size: 13.5px; margin: 0 0 24px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="eyebrow"><span class="dot"></span>INFORMATIK · KLASSE 10</div>
+  <h1>Vom Programmablaufplan zum Code</h1>
+  <p class="subtitle">Links steht der fertige Programmablaufplan, rechts das passende Arduino-Codegerüst. Ziehe die Codezeilen in der richtigen Reihenfolge an die markierte Stelle – Diagramm und Code wachsen dabei Schritt für Schritt gemeinsam.</p>
+
+  <div class="strip" id="strip"></div>
+  <div class="panel" id="panel"></div>
+</div>
+
+<script>
+(function(){
+
+  // ---------------- Task data ----------------
+  // Each task shares ONE node tree used both for the read-only diagram and
+  // for generating the code skeleton, so the two stay perfectly in sync.
+  var TASKS = [
+    {
+      key: 'seq',
+      eyebrow: 'AUFGABE 1 · NUR REIHENFOLGE',
+      title: 'LED zum Blinken bringen',
+      scenario: 'Diese LED soll dauerhaft im Sekundentakt blinken. Übersetze den Ablaufplan Schritt für Schritt in den passenden Arduino-Code.',
+      preambleLines: [],
+      setupFixedLines: [],
+      nodes: [
+        { type:'action', label:'Pin als Ausgang festlegen', code:'pinMode(9, OUTPUT);', target:'setup' },
+        { type:'action', label:'LED einschalten', code:'digitalWrite(9, HIGH);' },
+        { type:'action', label:'500 ms warten', code:'delay(500);' },
+        { type:'action', label:'LED ausschalten', code:'digitalWrite(9, LOW);' },
+        { type:'action', label:'500 ms warten', code:'delay(500);' }
+      ]
+    },
+    {
+      key: 'branch',
+      eyebrow: 'AUFGABE 2 · MIT VERZWEIGUNG',
+      title: 'LED über Taster steuern',
+      scenario: 'Ein Taster entscheidet, ob eine LED leuchtet. setup() ist schon fertig – übersetze jetzt den Ablaufplan in den Code von loop().',
+      preambleLines: [],
+      setupFixedLines: ['pinMode(9, OUTPUT);', 'pinMode(2, INPUT);'],
+      nodes: [
+        { type:'action', label:'Taster-Zustand einlesen', code:'int taster = digitalRead(2);' },
+        { type:'decision', label:'Taster gedrückt?', conditionCode:'if (taster == HIGH) {',
+          yes:[ { type:'action', label:'LED einschalten', code:'digitalWrite(9, HIGH);' } ],
+          no:[ { type:'action', label:'LED ausschalten', code:'digitalWrite(9, LOW);' } ]
+        }
+      ]
+    },
+    {
+      key: 'nested',
+      eyebrow: 'AUFGABE 3 · VERSCHACHTELTE VERZWEIGUNG',
+      title: 'Ampel mit Fußgängertaster',
+      scenario: 'Der Ampelzustand wird vereinfacht in der Variable „ampelZustand“ gespeichert. setup() und die Konstanten sind schon fertig – übersetze jetzt loop().',
+      preambleLines: ['const int GRUEN = 0;', 'const int GELB = 1;', 'const int ROT = 2;', 'int ampelZustand = GRUEN;'],
+      setupFixedLines: ['pinMode(3, INPUT);'],
+      nodes: [
+        { type:'action', label:'Taster-Zustand einlesen', code:'int taster = digitalRead(3);' },
+        { type:'decision', label:'Taster gedrückt?', conditionCode:'if (taster == HIGH) {',
+          yes:[
+            { type:'decision', label:'Ampel zeigt Grün?', conditionCode:'if (ampelZustand == GRUEN) {',
+              yes:[
+                { type:'action', label:'Ampel auf Gelb schalten', code:'ampelZustand = GELB;' },
+                { type:'action', label:'Ampel auf Rot schalten', code:'ampelZustand = ROT;' }
+              ],
+              no:[
+                { type:'action', label:'Zustand nicht verändern', code:'// Zustand bleibt unverändert' }
+              ]
+            }
+          ],
+          no:[
+            { type:'action', label:'Zustand nicht verändern', code:'// Zustand bleibt unverändert' }
+          ]
+        }
+      ]
+    }
+  ];
+
+  // ---------------- State ----------------
+  var state = {
+    current: 0,
+    solved: TASKS.map(function(){ return false; }),
+    finished: false,
+    runtime: TASKS.map(function(){ return null; })
+  };
+
+  var stripEl = document.getElementById('strip');
+  var panelEl = document.getElementById('panel');
+
+  function shuffle(arr){
+    for (var i = arr.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  }
+  function escapeHtml(str){
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // Assign a stepIndex to every node in DFS pre-order (action, or decision
+  // then its yes-branch then its no-branch). Both the diagram and the code
+  // skeleton are generated by walking the SAME tree in the SAME order, so
+  // stepIndex always means "this diagram node" == "this code slot".
+  function assignSteps(nodes, counter){
+    nodes.forEach(function(node){
+      node.stepIndex = counter.n++;
+      if (node.type === 'decision'){
+        assignSteps(node.yes, counter);
+        assignSteps(node.no, counter);
+      }
+    });
+  }
+
+  function collectChips(nodes, out){
+    nodes.forEach(function(node){
+      var text = node.type === 'decision' ? node.conditionCode : node.code;
+      out.push({ stepIndex: node.stepIndex, text: text });
+      if (node.type === 'decision'){
+        collectChips(node.yes, out);
+        collectChips(node.no, out);
+      }
+    });
+  }
+
+  function buildLoopLines(nodes, indent, lines){
+    nodes.forEach(function(node){
+      if (node.type === 'action'){
+        lines.push({ kind:'slot', stepIndex: node.stepIndex, indent: indent, text: node.code });
+      } else {
+        lines.push({ kind:'slot', stepIndex: node.stepIndex, indent: indent, text: node.conditionCode });
+        buildLoopLines(node.yes, indent + 1, lines);
+        lines.push({ kind:'fixed', indent: indent, text: '} else {' });
+        buildLoopLines(node.no, indent + 1, lines);
+        lines.push({ kind:'fixed', indent: indent, text: '}' });
+      }
+    });
+  }
+
+  function buildAllCodeLines(task){
+    var setupNodes = task.nodes.filter(function(n){ return n.target === 'setup'; });
+    var loopNodes = task.nodes.filter(function(n){ return n.target !== 'setup'; });
+
+    var setupLines = (task.setupFixedLines || []).map(function(t){ return { kind:'fixed', indent:1, text:t }; });
+    setupNodes.forEach(function(n){ setupLines.push({ kind:'slot', stepIndex:n.stepIndex, indent:1, text:n.code }); });
+
+    var loopLines = [];
+    buildLoopLines(loopNodes, 1, loopLines);
+
+    var lines = [];
+    (task.preambleLines || []).forEach(function(t){ lines.push({ kind:'fixed', indent:0, text:t }); });
+    if ((task.preambleLines || []).length) lines.push({ kind:'fixed', indent:0, text:'' });
+    lines.push({ kind:'fixed', indent:0, text:'void setup() {' });
+    lines = lines.concat(setupLines);
+    lines.push({ kind:'fixed', indent:0, text:'}' });
+    lines.push({ kind:'fixed', indent:0, text:'' });
+    lines.push({ kind:'fixed', indent:0, text:'void loop() {' });
+    lines = lines.concat(loopLines);
+    lines.push({ kind:'fixed', indent:0, text:'}' });
+    return lines;
+  }
+
+  function prepareTask(taskIndex){
+    var task = TASKS[taskIndex];
+    assignSteps(task.nodes, { n: 0 });
+    var chips = [];
+    collectChips(task.nodes, chips);
+    var totalSteps = chips.length;
+    shuffle(chips);
+    chips.forEach(function(c, i){ c.id = 'c' + taskIndex + '_' + i; c.placed = false; });
+    var codeLines = buildAllCodeLines(task);
+    return {
+      chips: chips,
+      codeLines: codeLines,
+      totalSteps: totalSteps,
+      currentStep: 0,
+      slotEls: {},     // stepIndex -> DOM element
+      nodeEls: {}      // stepIndex -> DOM element (diagram)
+    };
+  }
+
+  function getRuntime(taskIndex){
+    if (!state.runtime[taskIndex]) state.runtime[taskIndex] = prepareTask(taskIndex);
+    return state.runtime[taskIndex];
+  }
+
+  // ---------------- Progress strip ----------------
+  function renderStrip(){
+    stripEl.innerHTML = '';
+    TASKS.forEach(function(task, i){
+      var btn = document.createElement('button');
+      btn.className = 'task-btn';
+      if (i === state.current) btn.classList.add('current');
+      if (state.solved[i]) btn.classList.add('solved');
+      btn.innerHTML = '<span class="led"></span><span class="num">Aufgabe ' + (i + 1) + '</span>';
+      btn.addEventListener('click', function(){
+        state.current = i;
+        state.finished = false;
+        renderAll();
+      });
+      stripEl.appendChild(btn);
+    });
+  }
+
+  // ---------------- Diagram rendering (read-only) ----------------
+  function termEl(text){
+    var el = document.createElement('div');
+    el.className = 'term';
+    el.textContent = text;
+    return el;
+  }
+
+  function nodeStatusClass(node, currentStep){
+    if (node.stepIndex < currentStep) return 'done';
+    if (node.stepIndex === currentStep) return 'current';
+    return 'pending';
+  }
+
+  function renderDiagramSequence(containerEl, nodes, edges, runtime, entryEl, entryLabel, currentStep){
+    var prevEl = entryEl;
+    var pendingLabel = entryLabel;
+    nodes.forEach(function(node){
+      if (node.type === 'action'){
+        var el = document.createElement('div');
+        el.className = 'flownode shape-rect ' + nodeStatusClass(node, currentStep);
+        el.textContent = node.label;
+        containerEl.appendChild(el);
+        runtime.nodeEls[node.stepIndex] = el;
+        edges.push({ from: prevEl, to: el, label: pendingLabel });
+        pendingLabel = null;
+        prevEl = el;
+      } else {
+        var dEl = document.createElement('div');
+        dEl.className = 'flownode shape-diamond ' + nodeStatusClass(node, currentStep);
+        var inner = document.createElement('div');
+        inner.className = 'fn-inner';
+        inner.textContent = node.label;
+        dEl.appendChild(inner);
+        containerEl.appendChild(dEl);
+        runtime.nodeEls[node.stepIndex] = dEl;
+        edges.push({ from: prevEl, to: dEl, label: pendingLabel });
+        pendingLabel = null;
+
+        var branchRow = document.createElement('div');
+        branchRow.className = 'branch-row';
+        var yesCol = document.createElement('div');
+        yesCol.className = 'branch-col';
+        var noCol = document.createElement('div');
+        noCol.className = 'branch-col';
+        branchRow.appendChild(yesCol);
+        branchRow.appendChild(noCol);
+        containerEl.appendChild(branchRow);
+
+        var yesExit = renderDiagramSequence(yesCol, node.yes, edges, runtime, dEl, 'yes', currentStep);
+        var noExit = renderDiagramSequence(noCol, node.no, edges, runtime, dEl, 'no', currentStep);
+
+        var mergeDot = document.createElement('div');
+        mergeDot.className = 'merge-dot';
+        containerEl.appendChild(mergeDot);
+        edges.push({ from: yesExit, to: mergeDot, label: null });
+        edges.push({ from: noExit, to: mergeDot, label: null });
+        prevEl = mergeDot;
+      }
+    });
+    return prevEl;
+  }
+
+  function drawEdges(wrapEl, svgEl, edges){
+    var wrapRect = wrapEl.getBoundingClientRect();
+    var w = wrapEl.scrollWidth, h = wrapEl.scrollHeight;
+    svgEl.setAttribute('width', w);
+    svgEl.setAttribute('height', h);
+    svgEl.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    svgEl.innerHTML =
+      '<defs>' +
+      '<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">' +
+      '<path d="M0,0 L10,5 L0,10 z" fill="var(--trace-dim)"></path></marker>' +
+      '<marker id="arrow-yes" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">' +
+      '<path d="M0,0 L10,5 L0,10 z" fill="var(--success)"></path></marker>' +
+      '<marker id="arrow-no" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">' +
+      '<path d="M0,0 L10,5 L0,10 z" fill="var(--error)"></path></marker>' +
+      '</defs>';
+
+    edges.forEach(function(edge){
+      var fr = edge.from.getBoundingClientRect();
+      var to = edge.to.getBoundingClientRect();
+      var x1 = fr.left + fr.width / 2 - wrapRect.left;
+      var y1 = fr.bottom - wrapRect.top;
+      var x2 = to.left + to.width / 2 - wrapRect.left;
+      var y2 = to.top - wrapRect.top;
+      var midY = (y1 + y2) / 2;
+      var d = 'M ' + x1 + ' ' + y1 + ' L ' + x1 + ' ' + midY + ' L ' + x2 + ' ' + midY + ' L ' + x2 + ' ' + y2;
+
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+      var cls = 'edge-path';
+      var marker = 'url(#arrow)';
+      if (edge.label === 'yes'){ cls += ' yes'; marker = 'url(#arrow-yes)'; }
+      if (edge.label === 'no'){ cls += ' no'; marker = 'url(#arrow-no)'; }
+      path.setAttribute('class', cls);
+      path.setAttribute('marker-end', marker);
+      svgEl.appendChild(path);
+
+      if (edge.label){
+        var labelX = x1 + (x2 - x1) * 0.28;
+        var anchor = x2 >= x1 ? 'start' : 'end';
+        var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', labelX + (x2 >= x1 ? 6 : -6));
+        text.setAttribute('y', midY - 6);
+        text.setAttribute('text-anchor', anchor);
+        text.setAttribute('class', 'edge-label ' + edge.label);
+        text.textContent = edge.label === 'yes' ? 'ja' : 'nein';
+        svgEl.appendChild(text);
+      }
+    });
+  }
+
+  function renderDiagram(taskIndex){
+    var task = TASKS[taskIndex];
+    var runtime = getRuntime(taskIndex);
+    runtime.nodeEls = {};
+
+    var wrap = document.createElement('div');
+    wrap.className = 'flow-wrap';
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'flow-svg');
+    var main = document.createElement('div');
+    main.className = 'flow-main';
+    wrap.appendChild(svg);
+    wrap.appendChild(main);
+
+    var startEl = termEl('Start');
+    main.appendChild(startEl);
+
+    var edges = [];
+    var exitEl = renderDiagramSequence(main, task.nodes, edges, runtime, startEl, null, runtime.currentStep);
+
+    var endEl = termEl('Ende');
+    main.appendChild(endEl);
+    edges.push({ from: exitEl, to: endEl, label: null });
+
+    requestAnimationFrame(function(){ drawEdges(wrap, svg, edges); });
+    window.addEventListener('resize', function(){ drawEdges(wrap, svg, edges); });
+
+    return wrap;
+  }
+
+  // ---------------- Code panel rendering ----------------
+  function renderCodeBox(taskIndex){
+    var runtime = getRuntime(taskIndex);
+    var box = document.createElement('div');
+    box.className = 'code-box';
+    runtime.slotEls = {};
+
+    runtime.codeLines.forEach(function(line){
+      var lineEl = document.createElement('div');
+      lineEl.className = 'code-line' + (line.kind === 'fixed' ? ' fixed' : '');
+      var indentSpan = document.createElement('span');
+      indentSpan.className = 'indent';
+      indentSpan.style.width = (line.indent * 20) + 'px';
+      lineEl.appendChild(indentSpan);
+
+      if (line.kind === 'fixed'){
+        lineEl.appendChild(document.createTextNode(line.text));
+      } else {
+        var slotEl = document.createElement('span');
+        slotEl.className = 'code-slot';
+        slotEl.dataset.stepIndex = line.stepIndex;
+        applySlotVisual(slotEl, line, runtime);
+        lineEl.appendChild(slotEl);
+        runtime.slotEls[line.stepIndex] = slotEl;
+      }
+      box.appendChild(lineEl);
+    });
+
+    return box;
+  }
+
+  function applySlotVisual(slotEl, line, runtime){
+    slotEl.classList.remove('locked', 'active', 'filled', 'wrong-flash');
+    if (line.stepIndex < runtime.currentStep){
+      slotEl.classList.add('filled');
+      slotEl.textContent = line.text;
+    } else if (line.stepIndex === runtime.currentStep){
+      slotEl.classList.add('active');
+      slotEl.textContent = '…';
+    } else {
+      slotEl.classList.add('locked');
+      slotEl.textContent = '…';
+    }
+  }
+
+  // ---------------- Tray / drag & drop ----------------
+  function renderTray(taskIndex){
+    var runtime = getRuntime(taskIndex);
+    var tray = document.getElementById('tray');
+    if (!tray) return;
+    tray.innerHTML = '';
+    runtime.chips.forEach(function(chip){
+      if (chip.placed) return;
+      var el = document.createElement('div');
+      el.className = 'chip';
+      el.dataset.chipId = chip.id;
+      el.textContent = chip.text;
+      attachDrag(el, taskIndex, chip);
+      tray.appendChild(el);
+    });
+  }
+
+  function attachDrag(chipEl, taskIndex, chip){
+    chipEl.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      var startX = e.clientX, startY = e.clientY;
+      var rect = chipEl.getBoundingClientRect();
+
+      var ghost = chipEl.cloneNode(true);
+      ghost.classList.add('chip-ghost');
+      ghost.style.width = rect.width + 'px';
+      ghost.style.left = startX + 'px';
+      ghost.style.top = startY + 'px';
+      document.body.appendChild(ghost);
+      chipEl.style.opacity = '0.25';
+
+      function onMove(ev){
+        ghost.style.left = ev.clientX + 'px';
+        ghost.style.top = ev.clientY + 'px';
+      }
+      function onUp(ev){
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        ghost.remove();
+        chipEl.style.opacity = '';
+
+        var targetEl = document.elementFromPoint(ev.clientX, ev.clientY);
+        var slotEl = targetEl ? targetEl.closest('.code-slot') : null;
+        if (slotEl){
+          handleDrop(taskIndex, chip, slotEl);
+        }
+      }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+  }
+
+  function handleDrop(taskIndex, chip, slotEl){
+    var runtime = getRuntime(taskIndex);
+    var slotStep = Number(slotEl.dataset.stepIndex);
+
+    if (slotStep !== runtime.currentStep || chip.stepIndex !== runtime.currentStep){
+      flashWrong(slotEl);
+      setFeedback('Das passt hier noch nicht – achte auf den markierten Schritt im Diagramm.', 'bad');
+      return;
+    }
+
+    chip.placed = true;
+    runtime.currentStep++;
+    renderTray(taskIndex);
+    setFeedback('', '');
+    rerenderProgress(taskIndex);
+
+    if (runtime.currentStep >= runtime.totalSteps){
+      setFeedback('Richtig! Der komplette Code ist fertig übersetzt.', 'ok');
+      state.solved[taskIndex] = true;
+      renderStrip();
+      var nextBtn = document.getElementById('nextBtn');
+      if (nextBtn) nextBtn.hidden = false;
+    }
+  }
+
+  function flashWrong(slotEl){
+    slotEl.classList.add('wrong-flash');
+    setTimeout(function(){ slotEl.classList.remove('wrong-flash'); }, 350);
+  }
+
+  function rerenderProgress(taskIndex){
+    var runtime = getRuntime(taskIndex);
+    Object.keys(runtime.slotEls).forEach(function(stepIndex){
+      var line = runtime.codeLines.filter(function(l){ return l.kind === 'slot' && String(l.stepIndex) === String(stepIndex); })[0];
+      if (line) applySlotVisual(runtime.slotEls[stepIndex], line, runtime);
+    });
+    Object.keys(runtime.nodeEls).forEach(function(stepIndex){
+      var el = runtime.nodeEls[stepIndex];
+      el.classList.remove('done', 'current', 'pending');
+      var cls = Number(stepIndex) < runtime.currentStep ? 'done' : (Number(stepIndex) === runtime.currentStep ? 'current' : 'pending');
+      el.classList.add(cls);
+    });
+    var counterEl = document.getElementById('stepCounter');
+    if (counterEl){
+      var shown = Math.min(runtime.currentStep + (runtime.currentStep < runtime.totalSteps ? 1 : 0), runtime.totalSteps);
+      counterEl.textContent = 'Schritt ' + shown + ' von ' + runtime.totalSteps;
+    }
+  }
+
+  // ---------------- Feedback / reset ----------------
+  function setFeedback(text, kind){
+    var el = document.getElementById('feedback');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'feedback' + (kind ? ' ' + kind : '');
+  }
+
+  function resetTask(taskIndex){
+    state.runtime[taskIndex] = null; // force full rebuild (re-shuffled)
+    state.solved[taskIndex] = false;
+    renderStrip();
+    renderPanel();
+  }
+
+  // ---------------- Panel assembly ----------------
+  function renderPanel(){
+    panelEl.innerHTML = '';
+
+    if (state.finished){
+      renderDonePanel();
+      return;
+    }
+
+    var taskIndex = state.current;
+    var task = TASKS[taskIndex];
+    var runtime = getRuntime(taskIndex);
+
+    var eyebrow = document.createElement('div');
+    eyebrow.className = 'task-eyebrow';
+    eyebrow.textContent = task.eyebrow;
+    panelEl.appendChild(eyebrow);
+
+    var title = document.createElement('div');
+    title.className = 'task-title';
+    title.textContent = task.title;
+    panelEl.appendChild(title);
+
+    var scenario = document.createElement('p');
+    scenario.className = 'scenario';
+    scenario.textContent = task.scenario;
+    panelEl.appendChild(scenario);
+
+    var counter = document.createElement('div');
+    counter.className = 'step-counter';
+    counter.id = 'stepCounter';
+    var shown = Math.min(runtime.currentStep + (runtime.currentStep < runtime.totalSteps ? 1 : 0), runtime.totalSteps);
+    counter.textContent = 'Schritt ' + shown + ' von ' + runtime.totalSteps;
+    panelEl.appendChild(counter);
+
+    var dualWrap = document.createElement('div');
+    dualWrap.className = 'dual-wrap';
+
+    var diagramCol = document.createElement('div');
+    diagramCol.className = 'diagram-col';
+    var diagramLabel = document.createElement('div');
+    diagramLabel.className = 'col-label';
+    diagramLabel.textContent = 'Programmablaufplan';
+    diagramCol.appendChild(diagramLabel);
+    diagramCol.appendChild(renderDiagram(taskIndex));
+
+    var codeCol = document.createElement('div');
+    codeCol.className = 'code-col';
+    var codeLabel = document.createElement('div');
+    codeLabel.className = 'col-label';
+    codeLabel.textContent = 'Arduino-Code';
+    codeCol.appendChild(codeLabel);
+    codeCol.appendChild(renderCodeBox(taskIndex));
+
+    dualWrap.appendChild(diagramCol);
+    dualWrap.appendChild(codeCol);
+    panelEl.appendChild(dualWrap);
+
+    var trayLabel = document.createElement('div');
+    trayLabel.className = 'tray-label';
+    trayLabel.textContent = 'Codezeilen – ziehe sie an die markierte Stelle:';
+    panelEl.appendChild(trayLabel);
+
+    var tray = document.createElement('div');
+    tray.className = 'tray';
+    tray.id = 'tray';
+    panelEl.appendChild(tray);
+
+    var actions = document.createElement('div');
+    actions.className = 'actions';
+
+    var resetBtn = document.createElement('button');
+    resetBtn.textContent = 'Zurücksetzen';
+    resetBtn.className = 'btn-secondary';
+    resetBtn.addEventListener('click', function(){ resetTask(taskIndex); });
+
+    var nextBtn = document.createElement('button');
+    nextBtn.id = 'nextBtn';
+    nextBtn.hidden = !state.solved[taskIndex];
+    nextBtn.textContent = (taskIndex === TASKS.length - 1) ? 'Fertig ✓' : 'Weiter →';
+    nextBtn.addEventListener('click', function(){
+      if (taskIndex === TASKS.length - 1){
+        state.finished = true;
+        renderAll();
+      } else {
+        state.current = taskIndex + 1;
+        renderAll();
+      }
+    });
+
+    actions.appendChild(resetBtn);
+    actions.appendChild(nextBtn);
+    panelEl.appendChild(actions);
+
+    var feedback = document.createElement('div');
+    feedback.className = 'feedback';
+    feedback.id = 'feedback';
+    panelEl.appendChild(feedback);
+
+    if (state.solved[taskIndex]){
+      setFeedback('Richtig! Der komplette Code ist fertig übersetzt.', 'ok');
+    }
+
+    renderTray(taskIndex);
+  }
+
+  function renderDonePanel(){
+    var wrap = document.createElement('div');
+    wrap.className = 'done-panel';
+    wrap.innerHTML =
+      '<div class="done-emoji">🎉</div>' +
+      '<div class="done-title">Alle drei Aufgaben gelöst!</div>' +
+      '<p class="done-text">Du hast alle drei Programmablaufpläne erfolgreich in Arduino-Code übersetzt.</p>';
+
+    var restartBtn = document.createElement('button');
+    restartBtn.textContent = 'Nochmal von vorne';
+    restartBtn.addEventListener('click', function(){
+      state.current = 0;
+      state.finished = false;
+      state.solved = TASKS.map(function(){ return false; });
+      state.runtime = TASKS.map(function(){ return null; });
+      renderAll();
+    });
+    wrap.appendChild(restartBtn);
+    panelEl.appendChild(wrap);
+  }
+
+  function renderAll(){
+    renderStrip();
+    renderPanel();
+  }
+
+  renderAll();
+})();
+</script>
+</body>
+</html>

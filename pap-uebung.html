@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Programmablaufpläne üben · Klasse 10</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0f2027;
+    --bg-2: #0b191f;
+    --panel: #16333b;
+    --panel-2: #1c3e46;
+    --line: #274a52;
+    --trace: #c08552;
+    --trace-dim: #7a5a3d;
+    --accent: #4fd1c5;
+    --accent-dim: #2e6b66;
+    --text: #edeae1;
+    --text-dim: #9fb3b0;
+    --success: #5fd068;
+    --success-glow: rgba(95,208,104,0.35);
+    --error: #e2665a;
+    --error-glow: rgba(226,102,90,0.35);
+    --radius: 6px;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html,body{
+    margin:0; padding:0; min-height:100%;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(79,209,197,0.06), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(192,133,82,0.08), transparent 45%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    line-height: 1.55;
+  }
+
+  body{
+    display:flex;
+    justify-content:center;
+    padding: 32px 16px 64px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  .app{
+    width:100%;
+    max-width: 820px;
+  }
+
+  /* ---------- Header ---------- */
+  .eyebrow{
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--trace);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom: 10px;
+  }
+  .eyebrow .dot{
+    width:7px; height:7px; border-radius:50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  h1{
+    font-family: var(--display);
+    font-weight:700;
+    font-size: clamp(26px, 5vw, 34px);
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+  .subtitle{
+    color: var(--text-dim);
+    font-size: 14.5px;
+    margin: 0 0 26px;
+    max-width: 62ch;
+  }
+
+  /* ---------- Progress strip ---------- */
+  .strip{
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap: 0;
+    padding: 14px 10px;
+    margin-bottom: 26px;
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .strip::before{
+    content:"";
+    position:absolute;
+    left:60px; right:60px; top:50%;
+    height:2px;
+    background: repeating-linear-gradient(90deg, var(--trace-dim) 0 6px, transparent 6px 10px);
+    transform: translateY(-50%);
+    z-index:0;
+  }
+  .task-btn{
+    background: none;
+    border: none;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    cursor:pointer;
+    padding: 4px 26px;
+    position:relative;
+    z-index:1;
+    font-family: var(--mono);
+    color: var(--text-dim);
+  }
+  .task-btn .led{
+    width:16px; height:16px; border-radius:50%;
+    background: var(--bg-2);
+    border: 2px solid var(--line);
+    transition: all .2s ease;
+  }
+  .task-btn .num{
+    font-size: 11px;
+    letter-spacing:.05em;
+  }
+  .task-btn.current .led{
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent), 0 0 2px var(--accent);
+  }
+  .task-btn.current .num{ color: var(--accent); font-weight:600; }
+  .task-btn.solved .led{
+    border-color: var(--success);
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success-glow);
+  }
+  .task-btn.solved .num{ color: var(--success); }
+  .task-btn:hover .led{ border-color: var(--accent); }
+
+  /* ---------- Task panel ---------- */
+  .panel{
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px 22px 26px;
+  }
+  .task-eyebrow{
+    font-size: 11.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--trace);
+    margin-bottom: 8px;
+  }
+  .task-title{
+    font-family: var(--display);
+    font-weight:600;
+    font-size: 20px;
+    margin: 0 0 10px;
+  }
+  .scenario{
+    color: var(--text-dim);
+    font-size: 13.5px;
+    margin: 0 0 24px;
+    max-width: 68ch;
+  }
+
+  /* ---------- Flowchart ---------- */
+  .flow-wrap{
+    position: relative;
+    padding: 10px 6px 26px;
+    overflow-x: auto;
+  }
+  .flow-svg{
+    position:absolute;
+    top:0; left:0;
+    pointer-events:none;
+    z-index:0;
+    overflow: visible;
+  }
+  .edge-path{
+    fill:none;
+    stroke: var(--trace-dim);
+    stroke-width: 1.6;
+    stroke-dasharray: 5 4;
+  }
+  .edge-path.yes{ stroke: var(--success); stroke-dasharray:none; }
+  .edge-path.no{ stroke: var(--error); stroke-dasharray:none; }
+  .edge-label{
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight:600;
+  }
+  .edge-label.yes{ fill: var(--success); }
+  .edge-label.no{ fill: var(--error); }
+
+  .flow-main{
+    position: relative;
+    z-index: 1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 40px;
+    min-width: min-content;
+    margin: 0 auto;
+  }
+  .branch-row{
+    display:flex;
+    gap: 44px;
+    align-items:flex-start;
+    justify-content:center;
+  }
+  .branch-col{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 40px;
+  }
+
+  .term{
+    padding: 9px 30px;
+    border-radius: 999px;
+    background: var(--bg-2);
+    border: 1.5px solid var(--accent-dim);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .slot{
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+  }
+  .slot.shape-rect{
+    min-width: 190px;
+    max-width: 240px;
+    padding: 13px 16px;
+    border: 2px dashed var(--line);
+    border-radius: 6px;
+    background: var(--bg-2);
+    text-align:center;
+  }
+  .slot.shape-diamond{
+    width: 128px;
+    height: 128px;
+    border: 2px dashed var(--line);
+    border-radius: 10px;
+    background: var(--bg-2);
+    transform: rotate(45deg);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .slot.shape-diamond .slot-inner{
+    transform: rotate(-45deg);
+    width: 92px;
+    text-align:center;
+    line-height:1.25;
+  }
+  .slot.shape-rect.filled,
+  .slot.shape-diamond.filled{
+    border-style: solid;
+    border-color: var(--accent-dim);
+    background: var(--panel-2);
+  }
+  .slot.shape-rect.correct,
+  .slot.shape-diamond.correct{
+    border-color: var(--success);
+    background: rgba(95,208,104,0.12);
+    box-shadow: 0 0 0 3px var(--success-glow);
+  }
+  .slot.shape-rect.wrong,
+  .slot.shape-diamond.wrong{
+    border-color: var(--error);
+    background: rgba(226,102,90,0.12);
+    box-shadow: 0 0 0 3px var(--error-glow);
+  }
+  .slot .placeholder{
+    color: var(--text-dim);
+    font-size: 11px;
+    letter-spacing:.03em;
+  }
+  .merge-dot{
+    width: 8px; height:8px; border-radius:50%;
+    background: var(--trace-dim);
+  }
+
+  /* ---------- Tray ---------- */
+  .tray-label{
+    font-size: 12px;
+    color: var(--text-dim);
+    margin: 6px 0 10px;
+    letter-spacing:.02em;
+  }
+  .tray{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    min-height: 50px;
+    padding: 12px;
+    background: var(--bg-2);
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+    margin-bottom: 22px;
+  }
+  .tray:empty::after{
+    content: "Alle Bausteine sind platziert.";
+    color: var(--text-dim);
+    font-size: 12px;
+    font-style: italic;
+  }
+  .chip{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    padding: 9px 14px;
+    background: var(--panel-2);
+    border: 1.5px solid var(--accent-dim);
+    border-left: 4px solid var(--accent);
+    border-radius: 6px;
+    font-size: 12.5px;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.15);
+  }
+  .chip.chip-diamond{
+    border-color: var(--trace-dim);
+    border-left-color: var(--trace);
+  }
+  .chip .shape-icon{
+    font-size: 13px;
+    opacity: .8;
+  }
+  .chip-ghost{
+    position: fixed;
+    z-index: 999;
+    pointer-events:none;
+    opacity: 0.92;
+    transform: translate(-50%,-50%) scale(1.03);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  }
+
+  /* ---------- Actions ---------- */
+  .actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap: 12px;
+    align-items:center;
+  }
+  button{
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 11px 20px;
+    border-radius: var(--radius);
+    border: 1px solid var(--accent-dim);
+    background: var(--accent);
+    color: var(--bg-2);
+    cursor:pointer;
+    letter-spacing:.02em;
+  }
+  button:hover{ filter: brightness(1.08); }
+  button.btn-secondary{
+    background: none;
+    color: var(--text-dim);
+    border-color: var(--line);
+  }
+  button.btn-secondary:hover{ color: var(--text); border-color: var(--accent-dim); }
+  button[hidden]{ display:none; }
+
+  .feedback{
+    margin-top: 14px;
+    font-size: 13px;
+    min-height: 18px;
+  }
+  .feedback.ok{ color: var(--success); }
+  .feedback.bad{ color: var(--error); }
+
+  /* ---------- Completion screen ---------- */
+  .done-panel{
+    text-align:center;
+    padding: 20px 10px 10px;
+  }
+  .done-emoji{ font-size: 40px; margin-bottom: 10px; }
+  .done-title{
+    font-family: var(--display);
+    font-weight:700;
+    font-size: 22px;
+    margin: 0 0 8px;
+  }
+  .done-text{
+    color: var(--text-dim);
+    font-size: 13.5px;
+    margin: 0 0 24px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="eyebrow"><span class="dot"></span>INFORMATIK · KLASSE 10</div>
+  <h1>Programmablaufpläne üben</h1>
+  <p class="subtitle">Bringe die Bausteine per Drag &amp; Drop an die richtige Stelle im Programmablaufplan – von der einfachen Reihenfolge bis zur verschachtelten Verzweigung.</p>
+
+  <div class="strip" id="strip"></div>
+
+  <div class="panel" id="panel"></div>
+</div>
+
+<script>
+(function(){
+
+  // ---------------- Task data ----------------
+  // node types: 'action' (rect) | 'decision' (diamond, has yes/no arrays)
+  var TASKS = [
+    {
+      key:'seq',
+      eyebrow:'AUFGABE 1 · NUR REIHENFOLGE',
+      title:'LED zum Blinken bringen',
+      scenario:'Diese LED soll dauerhaft im Sekundentakt blinken: an, warten, aus, warten – und wieder von vorn. Bringe die Bausteine in die richtige Reihenfolge, damit der Programmablaufplan zu diesem Verhalten passt.',
+      nodes:[
+        {type:'action', label:'Pin als Ausgang festlegen'},
+        {type:'action', label:'LED einschalten'},
+        {type:'action', label:'500 ms warten'},
+        {type:'action', label:'LED ausschalten'},
+        {type:'action', label:'500 ms warten'}
+      ]
+    },
+    {
+      key:'branch',
+      eyebrow:'AUFGABE 2 · MIT VERZWEIGUNG',
+      title:'LED über Taster steuern',
+      scenario:'Ein Taster entscheidet, ob eine LED leuchtet: Ist der Taster gedrückt, soll die LED leuchten – andernfalls soll sie aus bleiben. Ordne die Bausteine so an, dass der Plan diese Entscheidung korrekt abbildet.',
+      nodes:[
+        {type:'action', label:'Taster-Zustand einlesen'},
+        {type:'decision', label:'Taster gedrückt?',
+          yes:[{type:'action', label:'LED einschalten'}],
+          no:[{type:'action', label:'LED ausschalten'}]
+        }
+      ]
+    },
+    {
+      key:'nested',
+      eyebrow:'AUFGABE 3 · VERSCHACHTELTE VERZWEIGUNG',
+      title:'Ampel mit Fußgängertaster',
+      scenario:'An einer Ampel gibt es einen Taster für Fußgänger. Wird er gedrückt, prüft die Steuerung zuerst, ob die Ampel gerade Grün zeigt: Nur dann schaltet sie über Gelb auf Rot. Ist der Taster nicht gedrückt, bleibt alles unverändert. Baue den passenden Programmablaufplan.',
+      nodes:[
+        {type:'action', label:'Taster-Zustand einlesen'},
+        {type:'decision', label:'Taster gedrückt?',
+          yes:[
+            {type:'decision', label:'Ampel zeigt Grün?',
+              yes:[
+                {type:'action', label:'Ampel auf Gelb schalten'},
+                {type:'action', label:'Ampel auf Rot schalten'}
+              ],
+              no:[
+                {type:'action', label:'Zustand nicht verändern'}
+              ]
+            }
+          ],
+          no:[
+            {type:'action', label:'Zustand nicht verändern'}
+          ]
+        }
+      ]
+    }
+  ];
+
+  // ---------------- State ----------------
+  var state = {
+    current: 0,
+    solved: TASKS.map(function(){ return false; }),
+    finished: false,
+    taskRuntime: TASKS.map(function(){ return null; }) // filled lazily per task: {slotNodes, slotEls, chips, filled}
+  };
+
+  var stripEl = document.getElementById('strip');
+  var panelEl = document.getElementById('panel');
+  var slotCounter = 0;
+  var chipCounter = 0;
+
+  function shuffle(arr){
+    for (var i = arr.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  }
+
+  // Build runtime data for a task: assigns slot ids to every action/decision node,
+  // collects a flat chip list (one chip per node), shuffles it.
+  function prepareTask(taskIndex){
+    var task = TASKS[taskIndex];
+    var slotNodes = {};
+    var chips = [];
+
+    function walk(nodes){
+      nodes.forEach(function(node){
+        var id = 's' + (slotCounter++);
+        node.slotId = id;
+        var shape = node.type === 'decision' ? 'diamond' : 'rect';
+        slotNodes[id] = { node: node, shape: shape, correctLabel: node.label };
+        var chipId = 'c' + (chipCounter++);
+        node.chipId = chipId;
+        chips.push({ id: chipId, label: node.label, shape: shape, placed: false });
+        if (node.type === 'decision'){
+          walk(node.yes);
+          walk(node.no);
+        }
+      });
+    }
+    walk(task.nodes);
+    shuffle(chips);
+
+    return {
+      slotNodes: slotNodes,   // slotId -> {node, shape, correctLabel}
+      slotEls: {},            // slotId -> DOM element (filled on render)
+      chips: chips,           // [{id,label,shape,placed}]
+      filled: {}              // slotId -> chipId
+    };
+  }
+
+  function getRuntime(taskIndex){
+    if (!state.taskRuntime[taskIndex]){
+      state.taskRuntime[taskIndex] = prepareTask(taskIndex);
+    }
+    return state.taskRuntime[taskIndex];
+  }
+
+  // ---------------- Rendering: progress strip ----------------
+  function renderStrip(){
+    stripEl.innerHTML = '';
+    TASKS.forEach(function(task, i){
+      var btn = document.createElement('button');
+      btn.className = 'task-btn';
+      if (i === state.current) btn.classList.add('current');
+      if (state.solved[i]) btn.classList.add('solved');
+      btn.innerHTML = '<span class="led"></span><span class="num">Aufgabe ' + (i + 1) + '</span>';
+      btn.addEventListener('click', function(){
+        state.current = i;
+        state.finished = false;
+        renderAll();
+      });
+      stripEl.appendChild(btn);
+    });
+  }
+
+  // ---------------- Rendering: flowchart ----------------
+  function createSlotEl(slotId, shape){
+    var el = document.createElement('div');
+    el.className = 'slot shape-' + shape;
+    el.dataset.slotId = slotId;
+    el.dataset.shape = shape;
+    if (shape === 'diamond'){
+      var inner = document.createElement('div');
+      inner.className = 'slot-inner';
+      inner.innerHTML = '<span class="placeholder">?</span>';
+      el.appendChild(inner);
+    } else {
+      el.innerHTML = '<span class="placeholder">leerer Baustein</span>';
+    }
+    el.addEventListener('click', function(){
+      unfillSlot(state.current, slotId);
+    });
+    return el;
+  }
+
+  function termEl(text){
+    var el = document.createElement('div');
+    el.className = 'term';
+    el.textContent = text;
+    return el;
+  }
+
+  // Recursively render a sequence of nodes into containerEl.
+  // entryEl: element the first node's edge originates from.
+  // entryLabel: 'yes' | 'no' | null — label for the edge from entryEl to the first node.
+  // Returns the exit element (to connect the *next* thing after this sequence).
+  function renderSequence(containerEl, nodes, edges, runtime, entryEl, entryLabel){
+    var prevEl = entryEl;
+    var pendingLabel = entryLabel;
+    nodes.forEach(function(node){
+      if (node.type === 'action'){
+        var el = createSlotEl(node.slotId, 'rect');
+        containerEl.appendChild(el);
+        runtime.slotEls[node.slotId] = el;
+        edges.push({ from: prevEl, to: el, label: pendingLabel });
+        pendingLabel = null;
+        prevEl = el;
+      } else if (node.type === 'decision'){
+        var dEl = createSlotEl(node.slotId, 'diamond');
+        containerEl.appendChild(dEl);
+        runtime.slotEls[node.slotId] = dEl;
+        edges.push({ from: prevEl, to: dEl, label: pendingLabel });
+        pendingLabel = null;
+
+        var branchRow = document.createElement('div');
+        branchRow.className = 'branch-row';
+        var yesCol = document.createElement('div');
+        yesCol.className = 'branch-col';
+        var noCol = document.createElement('div');
+        noCol.className = 'branch-col';
+        branchRow.appendChild(yesCol);
+        branchRow.appendChild(noCol);
+        containerEl.appendChild(branchRow);
+
+        var yesExit = renderSequence(yesCol, node.yes, edges, runtime, dEl, 'yes');
+        var noExit = renderSequence(noCol, node.no, edges, runtime, dEl, 'no');
+
+        var mergeDot = document.createElement('div');
+        mergeDot.className = 'merge-dot';
+        containerEl.appendChild(mergeDot);
+        edges.push({ from: yesExit, to: mergeDot, label: null });
+        edges.push({ from: noExit, to: mergeDot, label: null });
+        prevEl = mergeDot;
+      }
+    });
+    return prevEl;
+  }
+
+  function drawEdges(wrapEl, svgEl, edges){
+    var wrapRect = wrapEl.getBoundingClientRect();
+    var w = wrapEl.scrollWidth;
+    var h = wrapEl.scrollHeight;
+    svgEl.setAttribute('width', w);
+    svgEl.setAttribute('height', h);
+    svgEl.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    svgEl.innerHTML =
+      '<defs>' +
+      '<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">' +
+      '<path d="M0,0 L10,5 L0,10 z" fill="var(--trace-dim)"></path></marker>' +
+      '<marker id="arrow-yes" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">' +
+      '<path d="M0,0 L10,5 L0,10 z" fill="var(--success)"></path></marker>' +
+      '<marker id="arrow-no" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">' +
+      '<path d="M0,0 L10,5 L0,10 z" fill="var(--error)"></path></marker>' +
+      '</defs>';
+
+    edges.forEach(function(edge){
+      var fr = edge.from.getBoundingClientRect();
+      var to = edge.to.getBoundingClientRect();
+      var x1 = fr.left + fr.width / 2 - wrapRect.left;
+      var y1 = fr.bottom - wrapRect.top;
+      var x2 = to.left + to.width / 2 - wrapRect.left;
+      var y2 = to.top - wrapRect.top;
+      var midY = (y1 + y2) / 2;
+      var d = 'M ' + x1 + ' ' + y1 + ' L ' + x1 + ' ' + midY + ' L ' + x2 + ' ' + midY + ' L ' + x2 + ' ' + y2;
+
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+      var cls = 'edge-path';
+      var marker = 'url(#arrow)';
+      if (edge.label === 'yes'){ cls += ' yes'; marker = 'url(#arrow-yes)'; }
+      if (edge.label === 'no'){ cls += ' no'; marker = 'url(#arrow-no)'; }
+      path.setAttribute('class', cls);
+      path.setAttribute('marker-end', marker);
+      svgEl.appendChild(path);
+
+      if (edge.label){
+        var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        // Position along this edge's own horizontal segment (near the bend),
+        // offset towards its target so "yes" and "no" labels never collide.
+        var labelX = x1 + (x2 - x1) * 0.28;
+        var anchor = x2 >= x1 ? 'start' : 'end';
+        text.setAttribute('x', labelX + (x2 >= x1 ? 6 : -6));
+        text.setAttribute('y', midY - 6);
+        text.setAttribute('text-anchor', anchor);
+        text.setAttribute('class', 'edge-label ' + edge.label);
+        text.textContent = edge.label === 'yes' ? 'ja' : 'nein';
+        svgEl.appendChild(text);
+      }
+    });
+  }
+
+  function renderFlow(taskIndex){
+    var task = TASKS[taskIndex];
+    var runtime = getRuntime(taskIndex);
+    runtime.slotEls = {};
+
+    var wrap = document.createElement('div');
+    wrap.className = 'flow-wrap';
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'flow-svg');
+    var main = document.createElement('div');
+    main.className = 'flow-main';
+    wrap.appendChild(svg);
+    wrap.appendChild(main);
+
+    var startEl = termEl('Start');
+    main.appendChild(startEl);
+
+    var edges = [];
+    var exitEl = renderSequence(main, task.nodes, edges, runtime, startEl, null);
+
+    var endEl = termEl('Ende');
+    main.appendChild(endEl);
+    edges.push({ from: exitEl, to: endEl, label: null });
+
+    // reflect any already-filled state (e.g. returning to this task)
+    Object.keys(runtime.filled).forEach(function(slotId){
+      applySlotVisual(runtime, slotId);
+    });
+
+    requestAnimationFrame(function(){
+      drawEdges(wrap, svg, edges);
+    });
+    window.addEventListener('resize', function(){
+      drawEdges(wrap, svg, edges);
+    });
+
+    return wrap;
+  }
+
+  // ---------------- Slot fill / unfill / visuals ----------------
+  function applySlotVisual(runtime, slotId){
+    var el = runtime.slotEls[slotId];
+    if (!el) return;
+    var chipId = runtime.filled[slotId];
+    el.classList.remove('correct', 'wrong');
+    if (chipId){
+      var chip = runtime.chips.filter(function(c){ return c.id === chipId; })[0];
+      el.classList.add('filled');
+      var textHtml = escapeHtml(chip.label);
+      if (el.dataset.shape === 'diamond'){
+        el.innerHTML = '<div class="slot-inner">' + textHtml + '</div>';
+      } else {
+        el.innerHTML = textHtml;
+      }
+    } else {
+      el.classList.remove('filled');
+      if (el.dataset.shape === 'diamond'){
+        el.innerHTML = '<div class="slot-inner"><span class="placeholder">?</span></div>';
+      } else {
+        el.innerHTML = '<span class="placeholder">leerer Baustein</span>';
+      }
+    }
+  }
+
+  function escapeHtml(str){
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function fillSlot(taskIndex, slotId, chipId){
+    var runtime = getRuntime(taskIndex);
+    runtime.filled[slotId] = chipId;
+    runtime.chips.forEach(function(c){ if (c.id === chipId) c.placed = true; });
+    applySlotVisual(runtime, slotId);
+    renderTray(taskIndex);
+    setFeedback('', '');
+  }
+
+  function unfillSlot(taskIndex, slotId){
+    var runtime = getRuntime(taskIndex);
+    var chipId = runtime.filled[slotId];
+    if (!chipId) return;
+    delete runtime.filled[slotId];
+    runtime.chips.forEach(function(c){ if (c.id === chipId) c.placed = false; });
+    applySlotVisual(runtime, slotId);
+    renderTray(taskIndex);
+    setFeedback('', '');
+  }
+
+  // ---------------- Tray + drag & drop ----------------
+  function renderTray(taskIndex){
+    var runtime = getRuntime(taskIndex);
+    var tray = document.getElementById('tray');
+    if (!tray) return;
+    tray.innerHTML = '';
+    runtime.chips.forEach(function(chip){
+      if (chip.placed) return;
+      var el = document.createElement('div');
+      el.className = 'chip' + (chip.shape === 'diamond' ? ' chip-diamond' : '');
+      el.dataset.chipId = chip.id;
+      var icon = chip.shape === 'diamond' ? '&#9671;' : '&#9646;';
+      el.innerHTML = '<span class="shape-icon">' + icon + '</span><span>' + escapeHtml(chip.label) + '</span>';
+      attachDrag(el, taskIndex, chip);
+      tray.appendChild(el);
+    });
+  }
+
+  function attachDrag(chipEl, taskIndex, chip){
+    chipEl.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      var startX = e.clientX, startY = e.clientY;
+      var rect = chipEl.getBoundingClientRect();
+
+      var ghost = chipEl.cloneNode(true);
+      ghost.classList.add('chip-ghost');
+      ghost.style.width = rect.width + 'px';
+      ghost.style.left = startX + 'px';
+      ghost.style.top = startY + 'px';
+      document.body.appendChild(ghost);
+      chipEl.style.opacity = '0.25';
+
+      function onMove(ev){
+        ghost.style.left = ev.clientX + 'px';
+        ghost.style.top = ev.clientY + 'px';
+      }
+      function onUp(ev){
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        ghost.remove();
+        chipEl.style.opacity = '';
+
+        ghost.style.display = 'none';
+        var targetEl = document.elementFromPoint(ev.clientX, ev.clientY);
+        var slotEl = targetEl ? targetEl.closest('.slot') : null;
+
+        if (slotEl && slotEl.dataset.shape === chip.shape && !slotEl.classList.contains('filled')){
+          fillSlot(taskIndex, slotEl.dataset.slotId, chip.id);
+        }
+      }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+  }
+
+  // ---------------- Check / reset / feedback ----------------
+  function setFeedback(text, kind){
+    var el = document.getElementById('feedback');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'feedback' + (kind ? ' ' + kind : '');
+  }
+
+  function checkTask(taskIndex){
+    var runtime = getRuntime(taskIndex);
+    var slotIds = Object.keys(runtime.slotNodes);
+    var correctCount = 0;
+
+    slotIds.forEach(function(slotId){
+      var el = runtime.slotEls[slotId];
+      var chipId = runtime.filled[slotId];
+      el.classList.remove('correct', 'wrong');
+      if (!chipId){
+        return; // left empty, no styling change beyond neutral
+      }
+      var chip = runtime.chips.filter(function(c){ return c.id === chipId; })[0];
+      var expected = runtime.slotNodes[slotId].correctLabel;
+      if (chip.label === expected){
+        el.classList.add('correct');
+        correctCount++;
+      } else {
+        el.classList.add('wrong');
+      }
+    });
+
+    var total = slotIds.length;
+    if (correctCount === total){
+      setFeedback('Richtig! Alle Bausteine sitzen an der richtigen Stelle.', 'ok');
+      state.solved[taskIndex] = true;
+      renderStrip();
+      document.getElementById('nextBtn').hidden = false;
+    } else {
+      setFeedback(correctCount + ' von ' + total + ' Bausteinen richtig platziert – versuch es weiter.', 'bad');
+      document.getElementById('nextBtn').hidden = true;
+    }
+  }
+
+  function resetTask(taskIndex){
+    var runtime = getRuntime(taskIndex);
+    runtime.filled = {};
+    runtime.chips.forEach(function(c){ c.placed = false; });
+    Object.keys(runtime.slotEls).forEach(function(slotId){
+      var el = runtime.slotEls[slotId];
+      el.classList.remove('correct', 'wrong');
+      applySlotVisual(runtime, slotId);
+    });
+    renderTray(taskIndex);
+    setFeedback('', '');
+    document.getElementById('nextBtn').hidden = true;
+  }
+
+  // ---------------- Panel rendering ----------------
+  function renderPanel(){
+    panelEl.innerHTML = '';
+
+    if (state.finished){
+      renderDonePanel();
+      return;
+    }
+
+    var taskIndex = state.current;
+    var task = TASKS[taskIndex];
+
+    var eyebrow = document.createElement('div');
+    eyebrow.className = 'task-eyebrow';
+    eyebrow.textContent = task.eyebrow;
+    panelEl.appendChild(eyebrow);
+
+    var title = document.createElement('div');
+    title.className = 'task-title';
+    title.textContent = task.title;
+    panelEl.appendChild(title);
+
+    var scenario = document.createElement('p');
+    scenario.className = 'scenario';
+    scenario.textContent = task.scenario;
+    panelEl.appendChild(scenario);
+
+    var flow = renderFlow(taskIndex);
+    panelEl.appendChild(flow);
+
+    var trayLabel = document.createElement('div');
+    trayLabel.className = 'tray-label';
+    trayLabel.textContent = 'Bausteine – ziehe sie an die passende Stelle:';
+    panelEl.appendChild(trayLabel);
+
+    var tray = document.createElement('div');
+    tray.className = 'tray';
+    tray.id = 'tray';
+    panelEl.appendChild(tray);
+
+    var actions = document.createElement('div');
+    actions.className = 'actions';
+
+    var checkBtn = document.createElement('button');
+    checkBtn.textContent = 'Prüfen';
+    checkBtn.id = 'checkBtn';
+    checkBtn.addEventListener('click', function(){ checkTask(taskIndex); });
+
+    var resetBtn = document.createElement('button');
+    resetBtn.textContent = 'Zurücksetzen';
+    resetBtn.className = 'btn-secondary';
+    resetBtn.addEventListener('click', function(){ resetTask(taskIndex); });
+
+    var nextBtn = document.createElement('button');
+    nextBtn.id = 'nextBtn';
+    nextBtn.hidden = true;
+    nextBtn.textContent = (taskIndex === TASKS.length - 1) ? 'Fertig ✓' : 'Weiter →';
+    nextBtn.addEventListener('click', function(){
+      if (taskIndex === TASKS.length - 1){
+        state.finished = true;
+        renderAll();
+      } else {
+        state.current = taskIndex + 1;
+        renderAll();
+      }
+    });
+
+    actions.appendChild(checkBtn);
+    actions.appendChild(resetBtn);
+    actions.appendChild(nextBtn);
+    panelEl.appendChild(actions);
+
+    var feedback = document.createElement('div');
+    feedback.className = 'feedback';
+    feedback.id = 'feedback';
+    panelEl.appendChild(feedback);
+
+    if (state.solved[taskIndex]){
+      nextBtn.hidden = false;
+      setFeedback('Richtig! Alle Bausteine sitzen an der richtigen Stelle.', 'ok');
+    }
+
+    renderTray(taskIndex);
+  }
+
+  function renderDonePanel(){
+    var wrap = document.createElement('div');
+    wrap.className = 'done-panel';
+    wrap.innerHTML =
+      '<div class="done-emoji">🎉</div>' +
+      '<div class="done-title">Alle drei Aufgaben gelöst!</div>' +
+      '<p class="done-text">Reihenfolge, einfache Verzweigung und verschachtelte Verzweigung – du hast alle Programmablaufpläne richtig zusammengesetzt.</p>';
+
+    var restartBtn = document.createElement('button');
+    restartBtn.textContent = 'Nochmal von vorne';
+    restartBtn.addEventListener('click', function(){
+      state.current = 0;
+      state.finished = false;
+      state.solved = TASKS.map(function(){ return false; });
+      state.taskRuntime = TASKS.map(function(){ return null; });
+      renderAll();
+    });
+    wrap.appendChild(restartBtn);
+    panelEl.appendChild(wrap);
+  }
+
+  function renderAll(){
+    renderStrip();
+    renderPanel();
+  }
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
